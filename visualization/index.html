@@ -1,0 +1,130 @@
+<!-- index.html -->
+<!DOCTYPE html> 
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Data Viewer</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    #data-container { margin-top: 20px; }
+    pre { background-color: #f4f4f4; padding: 10px; white-space: pre-wrap; }
+    #user-input { margin-bottom: 10px; }
+    .multi-view {
+       display: flex;
+       gap: 10px;
+       margin-top: 20px;
+    }
+    .view-panel {
+       flex: 1;
+       border: 1px solid #ccc;
+       padding: 10px;
+       overflow: auto;
+    }
+    .input-field { margin-bottom: 5px; }
+  </style>
+</head>
+<body>
+  <h1>Documents Segmentation Viewer</h1>
+
+  <div id="user-input">
+    <div class="input-field">
+      <label for="fileName">Contract name:</label>
+      <!-- Example: train/contract0.json -->
+      <input type="text" id="fileName" placeholder="e.g., train/contract0.json">
+    </div>
+    <div class="input-field">
+      <label for="predictionsPath">Predictions Path:</label>
+      <!-- Default endpoint: singleview/predictions -->
+      <input type="text" id="predictionsPath" placeholder="e.g., singleview/predictions">
+    </div>
+    <div class="input-field">
+      <label for="groundTruthsPath">Ground Truths Path:</label>
+      <!-- Default endpoint: multiview/unified -->
+      <input type="text" id="groundTruthsPath" placeholder="e.g., multiview/unified">
+    </div>
+  </div>
+
+  <button onclick="loadSingleViewData()">Single View (Predictions)</button>
+  <button onclick="loadMultiViewData()">Multi View (Predictions | Ground Truth)</button>
+
+  <!-- Single view output (predictions only) -->
+  <div id="data-container">
+    <h2>Single View:</h2>
+    <pre id="output">Click a button to load data.</pre>
+  </div>
+
+  <!-- Multi view output (side-by-side panels) -->
+  <div id="multi-container" style="display: none;">
+    <h2>Multi View:</h2>
+    <div class="multi-view">
+      <div class="view-panel" id="left-output">
+        <h3>Model Output</h3>
+        <div id="left-content">Loading predictions view...</div>
+      </div>
+      <div class="view-panel" id="right-output">
+        <h3>Ground Truth</h3>
+        <div id="right-content">Loading unified view...</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // single view: load predictions only
+    async function loadSingleViewData() {
+      document.getElementById('data-container').style.display = 'block';
+      document.getElementById('multi-container').style.display = 'none';
+      const fileName = document.getElementById('fileName').value.trim();
+      if (!fileName) {
+        document.getElementById('output').textContent = "Please enter a contract name.";
+        return;
+      }
+      // Use user input for predictions path; default if left empty
+      const predictionsPath = document.getElementById('predictionsPath').value.trim() || 'singleview/predictions';
+      const url = `/${predictionsPath}/${fileName}`;
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`Failed to load ${fileName}`);
+        const htmlData = await response.text();
+        document.getElementById('output').innerHTML = htmlData;
+      } catch (error) {
+        document.getElementById('output').textContent = error.message;
+      }
+    }
+
+    // multi view: load both predictions (left) and unified (right)
+    async function loadMultiViewData() {
+      document.getElementById('data-container').style.display = 'none';
+      document.getElementById('multi-container').style.display = 'block';
+      const fileName = document.getElementById('fileName').value.trim();
+      if (!fileName) {
+        document.getElementById('left-content').textContent = "Please enter a contract name.";
+        document.getElementById('right-content').textContent = "Please enter a contract name.";
+        return;
+      }
+      const predictionsPath = document.getElementById('predictionsPath').value.trim() || 'singleview/predictions';
+      const groundTruthsPath = document.getElementById('groundTruthsPath').value.trim() || 'multiview/unified';
+      
+      // For both predictions and unified endpoints, use the full contract name (including folder, if any)
+      const predictionsUrl = `/${predictionsPath}/${fileName}`;
+      const unifiedUrl = `/${groundTruthsPath}/${fileName}`;
+      
+      try {
+        const [predictionsRes, unifiedRes] = await Promise.all([
+          fetch(predictionsUrl),
+          fetch(unifiedUrl)
+        ]);
+        if (!predictionsRes.ok) throw new Error(`Failed to load predictions view for ${fileName}`);
+        if (!unifiedRes.ok) throw new Error(`Failed to load unified view for ${fileName}`);
+        const predictionsHtml = await predictionsRes.text();
+        const unifiedHtml = await unifiedRes.text();
+        document.getElementById('left-content').innerHTML = predictionsHtml;
+        document.getElementById('right-content').innerHTML = unifiedHtml;
+      } catch (error) {
+        document.getElementById('left-content').textContent = error.message;
+        document.getElementById('right-content').textContent = error.message;
+      }
+    }
+  </script>
+</body>
+</html>
